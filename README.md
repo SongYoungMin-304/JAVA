@@ -135,3 +135,117 @@ com.example.java.callByValue.callByValue@1f17ae12
 → Call by Reference는 참조 자체를 넘기기 때문에 새로운 객체를 할당하면 원본 변수도 영향 있음
 
 **가장 큰 핵심은 호출자 변수와 수신자 파라미터는 Stack 영역 내에서 각각 존재하는 다른 변수**
+
+
+
+# bean scope
+### 빈 스코프는 무엇인가?
+
+- 빈이 사용되어지는 범위
+- 앱이 구동되는 동안 한개만 만들어서 쓸 것인지 HTTP 요청마다 생성해서 쓸 것인지 등등
+
+| singleton | (기본값) 스프링 Ioc 컨테이너당 하나의 인스턴스만 사용  |
+| --- | --- |
+| prototype | 매번 새로운 빈을 정의해서 사용 |
+| request | HTTP 라이플 사이클 마다 한개의 빈을 사용, web-aware 컨택스트에서만 사용가능 |
+| session | HTTP 세션마다 하나의 빈을 사용, web-aware 컨택스트에서만 사용가능 |
+| application | ServletContext 라이프사이클 동안 한개의 빈만사용 |
+| websocket | websocket 라이프사이클 안에서 한개의 빈만 사 |
+
+**※ Singleton 스코프의 빈이 prototype의 빈을 주입 받는 경우 prototype 빈의 역할을 제대로 수행하지 못한다.**
+
+```kotlin
+@Component
+public class Single {
+   
+   @Autowired
+   ProtoType protoType;
+
+   pubulic protoType getProtoType() {
+
+   }
+}
+
+-------------------------------------------------------
+
+@Component
+@Scope(value = "prototype")
+public class ProtoType {
+
+}
+```
+
+```kotlin
+@Component
+@Scope(value = "prototypte", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class ProtoType {
+
+}
+```
+
+- 해당 방식으로 정상적으로 Proto 방식으로 호출되게 할 수 있다.
+
+### 싱글토 프로토 타입 주소값 확인 예재
+
+```java
+@Slf4j
+@RestController
+public class SingletonController {
+
+    @Autowired
+    SingleService singleService;
+
+    @Autowired
+    ProtoService protoService;
+
+    @RequestMapping("/test")
+    public String test(){
+        log.info("주소 체크 싱글" + singleService.toString());
+        log.info("주소 체크 프로토" + protoService.toString());
+        singleService.print();
+        return "songyoungmin";
+    }
+
+}
+```
+
+```java
+@Slf4j
+@Component
+public class SingleService {
+
+    public void print(){
+        log.info("songPrint");
+    }
+
+}
+```
+
+```java
+@Slf4j
+@Component
+@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class ProtoService {
+
+    public void print(){
+        log.info("songPrint");
+    }
+}
+```
+
+- singleton 안에서 prototype 호출하면 처음 주입된 것이 그래도 사용이 되기 때문에
+(proxyMode = ScopedProxyMode.TARGET_CLASS 통해서 정상 동작하도록 처리
+
+```
+2023-05-21 23:41:05.816  INFO 28096 --- [nio-8080-exec-1] c.e.j.callByValue.SingletonController    : 주소 체크 싱글com.example.java.callByValue.SingleService@48b33399
+2023-05-21 23:41:05.818  INFO 28096 --- [nio-8080-exec-1] c.e.j.callByValue.SingletonController    : 주소 체크 프로토com.example.java.callByValue.ProtoService@489d9df1
+2023-05-21 23:41:05.818  INFO 28096 --- [nio-8080-exec-1] c.e.java.callByValue.SingleService       : songPrint
+2023-05-21 23:41:07.694  INFO 28096 --- [nio-8080-exec-2] c.e.j.callByValue.SingletonController    : 주소 체크 싱글com.example.java.callByValue.SingleService@48b33399
+2023-05-21 23:41:07.695  INFO 28096 --- [nio-8080-exec-2] c.e.j.callByValue.SingletonController    : 주소 체크 프로토com.example.java.callByValue.ProtoService@6f8863f6
+2023-05-21 23:41:07.695  INFO 28096 --- [nio-8080-exec-2] c.e.java.callByValue.SingleService       : songPrint
+2023-05-21 23:41:08.423  INFO 28096 --- [nio-8080-exec-3] c.e.j.callByValue.SingletonController    : 주소 체크 싱글com.example.java.callByValue.SingleService@48b33399
+2023-05-21 23:41:08.423  INFO 28096 --- [nio-8080-exec-3] c.e.j.callByValue.SingletonController    : 주소 체크 프로토com.example.java.callByValue.ProtoService@2e56da38
+```
+
+- 싱글톤은 주소값이 변경되지 않는다.
+- 프로토타입은 주소값이 호출될 때마다 변경되는 것을 알 수 있다.
